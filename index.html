@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard Cuaca Signifikan</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, Segoe UI, Roboto, Inter, Arial, sans-serif;
+            background: #f0f6fa;
+            color: #111827
+        }
+
+        .wrap {
+            max-width: 5000px;
+            margin: 0 auto;
+            padding: 16px
+        }
+
+        .top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .brand img {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb
+        }
+
+        .brand b {
+            font-size: 16px
+        }
+
+        .chip {
+            font-size: 12px;
+            color: #6b7280;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 8px 10px
+        }
+
+        .panel {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 14px;
+            margin-top: 12px
+        }
+
+        label {
+            font-size: 12px;
+            color: #6b7280;
+            display: block;
+            margin-bottom: 4px
+        }
+
+        select {
+            padding: 8px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            width: 100%
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px
+        }
+
+        @media (max-width:360px) {
+            .grid {
+                grid-template-columns: 1fr
+            }
+        }
+
+        pre {
+            background: #0b1020;
+            color: #f0d2c9;
+            padding: 10px;
+            border-radius: 8px;
+            overflow: auto
+        }
+
+        /* layout dua kolom untuk panel chart + narasi */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            /* kiri fluid, kanan 360px (narasi) */
+            gap: 16px;
+            align-items: stretch;
+        }
+
+        /* chart container (lebih tinggi supaya chart besar) */
+        .chart-card {
+            /* flex: 1 1 auto; */
+            /* min-width: 300px; */
+            /* biar responsive tetap rapi */
+            min-height: 360px;
+            /* <-- ubah angka ini sesuai kebutuhan */
+            background: #fff;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+            display: flex;
+            align-items: stretch;
+            /* penting supaya canvas fill height */
+        }
+
+        /* note / narasi */
+        .note-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            max-height: 360px;
+            overflow: auto;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+        }
+
+        /* canvas agar Chart.js menyesuaikan ukuran container */
+        #chart {
+            width: 100% !important;
+            /* height: 100% !important; */
+            /* display: block; */
+        }
+
+        /* responsive: kolom kanan turun ke bawah pada layar kecil */
+        @media (max-width:920px) {
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+
+            .note-card {
+                max-height: 360px;
+            }
+        }
+
+        /* scrollbar kuning kecil (opsional) */
+        .note-card::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .note-card::-webkit-scrollbar-track {
+            background: #f8fcff;
+            border-radius: 360px;
+        }
+
+        .note-card::-webkit-scrollbar-thumb {
+            background: #e2f4ff;
+            border-radius: 360px;
+        }
+
+        /* Bungkus chart + note jadi satu baris */
+        .row-visual {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+        }
+
+        /* kiri = chart (mengembang), kanan = note (fixed width) */
+        .row-visual .col-left {
+            flex: 1;
+            min-width: 360px;
+        }
+
+        .row-visual .col-right {
+            width: 340px;
+        }
+
+        /* pastikan panel chart punya padding sama seperti panel biasa */
+        .panel-chart {
+            padding: 18px;
+        }
+
+        /* Tetapkan tinggi canvas chart yang konsisten */
+        .panel-chart canvas {
+            width: 100% !important;
+            /* height: 360px !important; */
+            /* <--- ubah angka ini sesuai yang kamu mau */
+            /* display: block; */
+        }
+
+        /* jika mau responsiveness, gunakan min/max */
+        .panel-chart {
+            min-height: 360px;
+        }
+
+        /* ukuran konsisten seperti chart A */
+        #chartTrend {
+            width: 100% !important;
+            height: 360px !important;
+            display: block;
+        }
+
+        /* ===== Perbaikan dropdown trend ===== */
+        .trend-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            /* ⬅️ pindahkan dropdown ke kanan */
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .trend-header .trend-label {
+            margin: 0;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .trend-header .trend-select {
+            width: 200px !important;
+            /* ⬅️ ukurannya jadi pendek */
+            max-width: 200px;
+        }
+
+        /* heatmap tooltip */
+        #heatmapTooltip {
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+        }
+
+        /* legend kecil (optional jika mau tambah later) */
+        .heatmap-legend {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-top: 6px;
+            font-size: 13px;
+            color: #374151;
+        }
+
+        .heatmap-swatch {
+            width: 18px;
+            height: 12px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        /* ===== Info icon + popup (simpel & responsive) ===== */
+        .info-wrap {
+            display: inline-block;
+            position: relative;
+            margin-left: 8px;
+        }
+
+        /* tombol bundar kecil "i" */
+        .info-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            color: #1e3a8a;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(16, 24, 40, 0.06);
+            transition: transform .12s ease;
+        }
+
+        .info-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* popup card */
+        .info-popup {
+            position: absolute;
+            right: 0;
+            top: 42px;
+            width: 320px;
+            max-width: calc(100vw - 40px);
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #e6eefc;
+            box-shadow: 0 10px 30px rgba(16, 24, 40, 0.12);
+            padding: 12px 14px;
+            font-size: 13px;
+            color: #0f172a;
+            display: none;
+            z-index: 1200;
+        }
+
+        /* small pointer */
+        .info-popup::before {
+            content: "";
+            position: absolute;
+            top: -7px;
+            right: 16px;
+            border: 7px solid transparent;
+            border-bottom-color: #fff;
+            filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.03));
+        }
+
+        /* visible state */
+        .info-popup.visible {
+            display: block;
+        }
+
+        /* heading & list inside popup */
+        .info-popup h4 {
+            margin: 0 0 6px 0;
+            font-size: 14px;
+        }
+
+        .info-popup p {
+            margin: 6px 0;
+            line-height: 1.35;
+            color: #374151;
+        }
+
+        .info-popup small {
+            color: #6b7280;
+            display: block;
+            margin-top: 6px;
+        }
+
+        /* ===== Glossary (popup di sebelah kiri tombol) ===== */
+        .glossary-btn {
+            border: 0;
+            background: transparent;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #1f2937;
+            background: #ffffff;
+            border: 1px solid #e6eefc;
+            box-shadow: 0 6px 14px rgba(16, 24, 40, 0.04);
+        }
+
+        .glossary-popup {
+            position: absolute;
+            top: 42px;
+            right: auto;
+            left: auto;
+            width: 340px;
+            max-width: calc(100vw - 40px);
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #e6eefc;
+            box-shadow: 0 12px 32px rgba(16, 24, 40, 0.12);
+            padding: 12px 14px;
+            font-size: 13px;
+            color: #0f172a;
+            display: none;
+            z-index: 1300;
+        }
+
+        /* pointer */
+        .glossary-popup::before {
+            content: "";
+            position: absolute;
+            top: -7px;
+            width: 0;
+            height: 0;
+            border: 7px solid transparent;
+            border-bottom-color: #e6eefc;
+        }
+
+        /* visible */
+        .glossary-popup.visible {
+            display: block;
+        }
+
+        /* small header styles inside popup */
+        .glossary-popup h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+        }
+
+        .glossary-popup p {
+            margin: 6px 0;
+            line-height: 1.35;
+            color: #374151;
+        }
+
+        .glossary-popup .gloss-section {
+            margin-bottom: 8px;
+        }
+
+        .glossary-popup .gloss-term {
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .glossary-popup .gloss-desc {
+            color: #475569;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .glossary-popup::before {
+            display: none !important;
+        }
+
+        /* Sembunyikan X (kalau mau pakai klik di luar untuk tutup) */
+        #glossaryClose {
+            display: none;
+        }
+
+        /* ====== Strong, final fix untuk ukuran teks note-card (override rule lain) ====== */
+
+        /* target semua note-card secara spesifik & paksa ukuran */
+        .note-card,
+        #noteA,
+        #noteB,
+        #noteC,
+        .note-card .note-body,
+        #noteA .note-body,
+        #noteB .note-body,
+        #noteC .note-body {
+            font-family: system-ui, Inter, Roboto, Arial, sans-serif !important;
+            font-size: 14px !important;
+            /* ukuran standard untuk isi */
+            line-height: 1.4 !important;
+            color: #111827 !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Judul di dalam note-card — jangan terlalu besar */
+        .note-card h3,
+        #noteA h3,
+        #noteB h3,
+        #noteC h3 {
+            font-size: 18px !important;
+            /* judul sedikit lebih besar dari isi */
+            margin: 0 0 6px 0 !important;
+            line-height: 1.12 !important;
+            font-weight: 700 !important;
+        }
+
+        /* ringkasan kecil / tip di dalam note-body */
+        .note-card .note-body small,
+        .note-card .note-body .small,
+        .note-card .note-body .tip {
+            font-size: 12px !important;
+            color: #6b7280 !important;
+            display: block;
+            margin-top: 6px;
+        }
+
+        /* Batasi lebar teks kanan agar tidak overflow mudah */
+        .note-card {
+            max-height: 360px !important;
+            overflow: auto !important;
+            padding: 14px !important;
+        }
+
+        /* Jika ada transform/scale pada heading yang menyebabkan melompat,
+   reset transform untuk judul di note-card */
+        .note-card h3 {
+            transform: none !important;
+        }
+
+        /* Mobile-specific: kurangi ukuran sedikit agar pas layar kecil */
+        @media (max-width: 480px) {
+
+            .note-card,
+            #noteA .note-body,
+            #noteB .note-body,
+            #noteC .note-body {
+                font-size: 13px !important;
+            }
+
+            .note-card h3 {
+                font-size: 16px !important;
+            }
+        }
+
+        /* Pastikan scrollbar berada di dalam dan tidak mempengaruhi layout */
+        .note-card::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+        }
+
+        /* ---------- Fix mobile: responsive note-card fonts & widths ---------- */
+        /* baca: ini ditaruh di akhir style supaya override rule lain */
+
+        :root {
+            /* fallback values, bisa diubah jika perlu */
+            --note-font-min: 12px;
+            --note-font-mid: 13px;
+            --note-font-max: 14px;
+            --note-heading-min: 14px;
+            --note-heading-max: 18px;
+        }
+
+        /* gunakan clamp supaya font menyesuaikan lebar layar */
+        .note-card,
+        #noteA,
+        #noteB,
+        #noteC,
+        .note-card .note-body,
+        #noteA .note-body,
+        #noteB .note-body,
+        #noteC .note-body {
+            font-size: clamp(var(--note-font-min), 2.2vw, var(--note-font-max)) !important;
+            line-height: 1.4 !important;
+            box-sizing: border-box !important;
+        }
+
+        /* judul tidak meledak; sedikit lebih besar dari isi */
+        .note-card h3,
+        #noteA h3,
+        #noteB h3,
+        #noteC h3 {
+            font-size: clamp(var(--note-heading-min), 4.2vw, var(--note-heading-max)) !important;
+            margin: 0 0 6px 0 !important;
+            line-height: 1.12 !important;
+            font-weight: 700 !important;
+            transform: none !important;
+        }
+
+        /* jika panel kanan (kolom narasi) semula fixed width, biarkan fleksibel di mobile */
+        @media (max-width: 920px) {
+
+            .row-visual .col-right,
+            .note-card,
+            #noteA,
+            #noteB,
+            #noteC {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            /* kalau kamu pakai .two-col on small screens, pastikan note-card tidak memaksa overflow */
+            .two-col .note-card {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            /* tombol dan kontrol tetap rapi */
+            .trend-header .trend-select {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+        }
+
+        /* ekstra: jangan biarkan teks kanan muncul sangat besar setelah filter:
+   kadang Chart.js atau script lain menambahkan transform/scale; reset */
+        .note-card,
+        .note-card * {
+            transform: none !important;
+            text-transform: none !important;
+            -webkit-text-size-adjust: 100% !important;
+        }
+
+        /* jaga scrollbar di dalam box supaya tidak mempengaruhi ukuran */
+        .note-card {
+            overflow: auto !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="top">
+            <div class="brand">
+                <img src="assets/icon_bmkg.png" alt="BMKG"
+                    onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Placeholder_view_vector.svg/120px-Placeholder_view_vector.svg.png'">
+                <div>
+                    <b>Dashboard Cuaca Signifikan Berbasis Sandi METAR</b>
+                    <div style="font-size:12px;color:#6b7280">Direktorat Meteorologi Penerbangan</div>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="chip" id="chipData">Data: –</span>
+
+                <div class="glossary-wrap" style="display:flex; align-items:center; gap:8px;">
+                    <button id="glossaryBtn" class="glossary-btn" aria-expanded="false" title="Glosarium">
+                        Glosarium
+                    </button>
+                </div>
+
+                <!-- Info icon + popup -->
+                <div class="info-wrap" aria-hidden="false">
+                    <button id="infoBtn" class="info-btn" aria-expanded="false" title="Info dashboard">i</button>
+
+                    <div id="infoPopup" class="info-popup" role="dialog" aria-modal="false" aria-labelledby="infoTitle">
+                        <h4 id="infoTitle">Tentang Dashboard</h4>
+                        <p>
+                            Dashboard ini menampilkan jumlah, frekuensi, dan pola kejadian cuaca signifikan
+                            dari lima Bandara. Data diambil dari sandi METAR tahun 2024. Cuaca signifikan yang
+                            ditampilkan cenderung bersamaan dengan
+                            turunnya yaitu dibawah 5000 feet jarak pandang dan atau kecepatan angin diatas 10 knot.
+                            Gunakan filter (Bandar Udara, Bulan, Cuaca Signifikan) untuk melihat informasi yang
+                            dibutuhkan.
+                        </p>
+                        <h4 id="infoTitle">Tujuan Dashboard</h4>
+                        <p>
+                            Cuaca signifikan berperan besar dalam keselamatan dan kelancaran penerbangan karena dapat
+                            menurunkan jarak pandang, memengaruhi kestabilan atmosfer, dan mengganggu performa pesawat.
+                            Pola kejadiannya penting dipantau untuk mendukung keputusan operasional dan mitigasi risiko.
+                            Dampak cuaca signifikan dapat berupa penundaan, perubahan rute, penggunaan bahan bakar,
+                            potensi turbulensi atau wind shear, hingga pembatasan layanan darat. Kondisi ini dapat
+                            mengurangi kapasitas bandara, misalnya dengan menurunkan laju pendaratan dan lepas landas
+                            sehingga meningkatkan antrian pesawat. Oleh karena itu, Dashboard ini diharapkan dapat
+                            memberikan informasi cuaca signifikan demi meningkatkan kualitas layanan meteorologi
+                            penerbangan.
+                        </p>
+                        <small>Tekan ESC atau klik di luar popup untuk menutup.</small>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Glossary popup (static content — kamu bisa edit nanti) -->
+        <div id="glossaryPopup" class="glossary-popup" role="dialog" aria-modal="false" aria-labelledby="glossaryTitle">
+            <h4 id="glossaryTitle">Glosarium</h4>
+
+            <div class="gloss-section">
+                <div class="gloss-term">Jenis Cuaca Signifikan:</div>
+                <div class="gloss-desc">
+                    <div><strong>RA</strong> (Rain): Hujan</div>
+                    <div><strong>TS</strong> (Thunderstorm): Badai petir</div>
+                    <div><strong>SHRA</strong> (Shower Rain): Hujan secara tiba-tiba</div>
+                    <div><strong>BR</strong> (Mist): Kabut tipis</div>
+                    <div><strong>FG</strong> (Fog): Kabut tebal</div>
+                    <div><strong>FU</strong> (Smoke): Asap</div>
+                    <div><strong>HZ</strong> (Haze): Jerebu/partikel</div>
+                    <div><strong>VA</strong> (Volcanic Ash): Abu vulkanik</div>
+                </div>
+            </div>
+
+            <div class="gloss-section">
+                <div class="gloss-term">Intensitas Cuaca Signifikan:</div>
+                <div class="gloss-desc">
+                    <div><strong>-</strong> (Light): Ringan</div>
+                    <div><strong>+</strong> (Heavy): Lebat/intens</div>
+                </div>
+            </div>
+
+            <small style="color:#6b7280; display:block; margin-top:8px;">Tekan ESC atau klik di luar popup untuk
+                menutup.</small>
+        </div>
+
+        <div class="panel">
+            <div class="grid">
+                <div>
+                    <label for="station">Bandar Udara (ICAO)</label>
+                    <select id="station">
+                        <option value="ALL">Semua</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="bulan">Bulan</label>
+                    <select id="bulan">
+                        <option value="ALL">Semua</option>
+                        <option value="january">Januari</option>
+                        <option value="february">Februari</option>
+                        <option value="march">Maret</option>
+                        <option value="april">April</option>
+                        <option value="may">Mei</option>
+                        <option value="june">Juni</option>
+                        <option value="july">Juli</option>
+                        <option value="august">Agustus</option>
+                        <option value="september">September</option>
+                        <option value="october">Oktober</option>
+                        <option value="november">November</option>
+                        <option value="december">Desember</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL: Chart A (JUMLAH CUACA SIGNIFIKAN) -->
+        <div class="panel" id="panelA" style="padding:12px;">
+            <div class="two-col">
+                <div class="chart-card">
+                    <!-- bungkus canvas supaya bisa stretch penuh -->
+                    <canvas id="chart"></canvas>
+                </div>
+
+                <div class="note-card" id="noteA">
+                    <h3>Jumlah Cuaca Signifikan</h3>
+                    <div class="note-body">Memuat ringkasan...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL: Chart B (TREN HARIAN) -->
+        <div class="panel" id="panelB" style="padding:12px; margin-top:12px;">
+            <div class="trend-header">
+
+                <label for="weatherFilter" class="trend-label">Cuaca Signifikan</label>
+                <select id="weatherFilter" class="trend-select">
+                    <option value="ALL">Semua</option>
+                    <option value="TS">TS</option>
+                    <option value="TSRA">TSRA</option>
+                    <option value="-TSRA">-TSRA</option>
+                    <option value="+TSRA">+TSRA</option>
+                    <option value="RA">RA</option>
+                    <option value="-RA">-RA</option>
+                    <option value="+RA">+RA</option>
+                    <option value="BR">BR</option>
+                    <option value="HZ">HZ</option>
+                    <option value="FG">FG</option>
+                    <!-- option lain akan diisi dinamis oleh script -->
+                </select>
+            </div>
+            <div class="two-col">
+                <div class="chart-card">
+                    <canvas id="chartTrend"></canvas>
+                </div>
+
+                <div class="note-card" id="noteB">
+                    <h3>Frekuensi Cuaca Signifikan</h3>
+                    <div class="note-body">Memuat ringkasan tren...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL: Chart C (HEATMAP jam × tanggal) -->
+        <div class="panel" id="panelC" style="padding:12px; margin-top:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <label for="timeWx" style="font-size:13px;color:#6b7280;margin-right:6px;">Cuaca Signifikan</label>
+                    <select id="timeWx" style="padding:6px 8px;border-radius:6px;border:1px solid #e5e7eb;">
+                        <option value="ALL">Semua</option>
+                        <!-- opsi akan diisi dinamis -->
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+                <!-- wrapper buat scroll horizontal jika banyak tanggal -->
+                <div style="flex:1; overflow:auto; padding:6px; background:transparent; border-radius:10px;">
+                    <div style="display:inline-block; padding:6px; background:#fff; border-radius:10px;">
+                        <canvas id="heatmapCanvas" style="display:block;"></canvas>
+                    </div>
+                </div>
+
+                <div class="note-card" id="noteC" style="width:340px;">
+                    <h3>Pola Kejadian Cuaca Signifikan</h3>
+                    <div class="note-body">Memuat ringkasan heatmap...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- tooltip floating (kosongkan di awal) -->
+        <div id="heatmapTooltip"
+            style="position:fixed; pointer-events:none; display:none; z-index:9999;
+    background: rgba(17,24,39,0.95); color:#fff; padding:8px; border-radius:6px; font-size:13px; max-width:320px; white-space:pre-wrap;">
+        </div>
+
+
+        <!-- DEBUG LOG -->
+        <!-- <div class="panel">
+            <b>Debug Log</b>
+            <pre id="log">memuat…</pre>
+        </div> -->
+    </div>
+
+    <script>
+        // ====== KONFIGURASI DASAR ======
+        const CSV_PATH = 'data/metar_2.csv';
+        const elLog = document.getElementById('log');
+        const elChip = document.getElementById('chipData');
+        const elChart = document.getElementById('chart');
+        const selStn = document.getElementById('station');
+        const selMon = document.getElementById('bulan');
+
+        function log(t) { if (!elLog) return; elLog.textContent += (elLog.textContent ? '\n' : '') + t; }
+
+        const MONTH_MAP = {
+            jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, may: 5, jun: 6, jul: 7, aug: 8, agu: 8, sep: 9, oct: 10, okt: 10, nov: 11, dec: 12, des: 12,
+            januari: 1, februari: 2, maret: 3, april: 4, mei2: 5, juni: 6, juli: 7, agustus: 8, september: 9, oktober: 10, november: 11, desember: 12
+        };
+
+        function toISO(dateStr, timeStr) {
+            if (!dateStr) return '';
+            dateStr = String(dateStr).trim(); timeStr = String(timeStr || '').trim();
+            let y, m, d;
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) { const [dd, mm, yy] = dateStr.split('/').map(Number); d = dd; m = mm; y = yy; }
+            else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) { [y, m, d] = dateStr.split('-').map(Number); }
+            else { return ''; }
+            let hh = 0, mmn = 0;
+            if (/^\d{2}:\d{2}$/.test(timeStr)) [hh, mmn] = timeStr.split(':').map(Number);
+            else if (/^\d{2}\.\d{2}$/.test(timeStr)) [hh, mmn] = timeStr.split('.').map(Number);
+            else if (/^\d{4}$/.test(timeStr)) { hh = +timeStr.slice(0, 2); mmn = +timeStr.slice(2, 4); }
+            return new Date(Date.UTC(y, (m || 1) - 1, d || 1, hh || 0, mmn || 0, 0)).toISOString();
+        }
+
+        function parseHourFromTime(t) {
+            if (!t) return null;
+
+            // contoh input t:
+            // "0930", "2135Z", "05:20", "1520Z AUTO", "0130Z"
+
+            // ambil dulu hanya digit
+            const d = String(t).match(/\d{2}/g);
+            if (!d || d.length === 0) return null;
+
+            // jam = dua digit pertama
+            const hour = parseInt(d[0], 10);
+            return (hour >= 0 && hour <= 23) ? hour : null;
+        }
+
+        // ===== HEATMAP: jam (0..23) x tanggal (YYYY-MM-DD) =====
+        let HEATMAP_STATE = { canvas: null, ctx: null, cellW: 18, cellH: 20, dates: [], counts: null, samples: null };
+
+        // renderTimeHeatmap — aggregate by day-of-month (1..31) × hour (0..23)
+        // Replace the entire existing renderTimeHeatmap function with this.
+        function renderTimeHeatmap(rows, wx = 'ALL', opts = {}) {
+            // opts: { cellW, cellH } — keep defaults
+            const cellW = opts.cellW || HEATMAP_STATE.cellW || 18;
+            const cellH = opts.cellH || HEATMAP_STATE.cellH || 20;
+
+            // 1) filter per cuaca jika diminta
+            let dataRows = rows;
+            if (wx && wx !== 'ALL') {
+                const target = String(wx).trim().toUpperCase();
+                dataRows = rows.filter(r => {
+                    const s1 = String(r.sigwx || '').trim().toUpperCase();
+                    const sall = String(r.sigwx_all || '').toUpperCase();
+                    const toks = (sall || '').replace(/\+/g, ' ').replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+                    return s1 === target || toks.includes(target) || (sall || '').includes(target);
+                });
+            }
+
+            // 2) We'll aggregate by day-of-month (1..31) and hour (0..23).
+            const H = 24;
+            const D = 31; // fixed columns 1..31
+            const counts = Array.from({ length: H }, () => new Array(D).fill(0));
+            const samples = Array.from({ length: H }, () => Array.from({ length: D }, () => []));
+
+            // 3) populate counts & samples
+            for (const r of dataRows) {
+                // parse hour from r.time
+                const hour = parseHourFromTime(r.time);
+                if (hour === null || isNaN(hour) || hour < 0 || hour > 23) continue;
+
+                // get ISO date and extract day-of-month
+                let iso = '';
+                if (r.date) { iso = toISO(r.date, '') || ''; if (iso) iso = iso.slice(0, 10); }
+                if (!iso && r.datetime) { const d = new Date(r.datetime); if (!isNaN(+d)) iso = d.toISOString().slice(0, 10); }
+                if (!iso) continue;
+
+                const dt = new Date(iso + 'T00:00:00Z'); // safe parse
+                if (isNaN(+dt)) continue;
+                const day = dt.getUTCDate(); // 1..31
+
+                const i = day - 1; // column index 0..30
+                const j = hour;    // row index 0..23
+                counts[j][i] += 1;
+
+                // store sample detail: keep full date + time + sigwx for tooltip examples
+                const sig = (r.sigwx || r.sigwx_all || '').trim() || '-';
+                const tstr = `${iso} ${String(r.time || '').trim()} — ${sig}`;
+                if (samples[j][i].length < 12) samples[j][i].push(tstr);
+            }
+
+            // 4) prepare canvas and sizing
+            const canvas = document.getElementById('heatmapCanvas');
+            const tooltip = document.getElementById('heatmapTooltip');
+            if (!canvas) return;
+            HEATMAP_STATE.canvas = canvas;
+            HEATMAP_STATE.ctx = canvas.getContext('2d');
+
+            // ruang lebih untuk judul, label Y, dan label X
+            const paddingTop = 48;     // lebih tinggi supaya judul & baris atas punya ruang
+            const paddingLeft = 84;    // lebih lebar supaya label jam (y) berada di luar grid
+            const paddingRight = 12;
+            const paddingBottom = 64;  // lebih besar supaya label tanggal (x) yang miring muat
+
+
+            const width = Math.max(300, D * cellW + paddingLeft + paddingRight);
+            const height = paddingTop + paddingBottom + H * cellH;
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            const ctx = HEATMAP_STATE.ctx;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+            ctx.font = '12px system-ui, Inter, Roboto, Arial';
+            // === JUDUL CHART ===
+            ctx.fillStyle = '#111827';
+            ctx.font = '600 16px system-ui, Inter, Roboto, Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(
+                'Jumlah Cuaca Signifikan',
+                paddingLeft + (D * cellW) / 2,
+                26
+            );
+
+
+            // 5) color scale
+            let maxC = 0;
+            for (let r = 0; r < H; r++) for (let c = 0; c < D; c++) if (counts[r][c] > maxC) maxC = counts[r][c];
+            if (maxC === 0) maxC = 1;
+            function colorFor(v) {
+                const t = Math.min(1, v / maxC);
+                if (t < 0.5) {
+                    const a = t / 0.5;
+                    const c1 = [247, 251, 255], c2 = [107, 174, 214];
+                    const r = Math.round(c1[0] + (c2[0] - c1[0]) * a);
+                    const g = Math.round(c1[1] + (c2[1] - c1[1]) * a);
+                    const b = Math.round(c1[2] + (c2[2] - c1[2]) * a);
+                    return `rgb(${r},${g},${b})`;
+                } else {
+                    const a = (t - 0.5) / 0.5;
+                    const c1 = [107, 174, 214], c2 = [8, 81, 156];
+                    const r = Math.round(c1[0] + (c2[0] - c1[0]) * a);
+                    const g = Math.round(c1[1] + (c2[1] - c1[1]) * a);
+                    const b = Math.round(c1[2] + (c2[2] - c1[2]) * a);
+                    return `rgb(${r},${g},${b})`;
+                }
+            }
+
+            // 6) draw y labels (hours)
+            ctx.fillStyle = '#374151';
+            ctx.textAlign = 'right';
+            for (let h = 0; h < H; h++) {
+                const y = paddingTop + h * cellH + cellH / 2 + 4;
+                ctx.fillText(String(h).padStart(2, '0') + ':00', paddingLeft - 8, y);
+            }
+
+            // === LABEL SUMBU Y ===
+            ctx.save();
+            ctx.translate(26, paddingTop + (H * cellH) / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.font = '12px system-ui, Inter, Roboto, Arial';
+            ctx.fillStyle = '#374151';
+            ctx.fillText('Waktu', 0, 0);
+            ctx.restore();
+
+
+            // 7) draw cells + x labels (1..31)
+            for (let i = 0; i < D; i++) {
+                const x = paddingLeft + i * cellW;
+                // draw column header: day number (rotated slightly)
+                ctx.save();
+                ctx.translate(x + cellW / 2, paddingTop + H * cellH + 14);
+                ctx.rotate(-Math.PI / 8);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#374151';
+                ctx.fillText(String(i + 1), 0, 0);
+                ctx.restore();
+
+                for (let h = 0; h < H; h++) {
+                    const v = counts[h][i];
+                    const cx = x;
+                    const cy = paddingTop + h * cellH;
+                    ctx.fillStyle = v ? colorFor(v) : '#f3f4f6';
+                    ctx.fillRect(cx, cy, cellW - 1, cellH - 1);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                    ctx.strokeRect(cx + 0.25, cy + 0.25, cellW - 1.5, cellH - 1.5);
+                }
+            }
+
+            // === LABEL SUMBU X ===
+            ctx.font = '12px system-ui, Inter, Roboto, Arial';
+            ctx.fillStyle = '#374151';
+            ctx.textAlign = 'center';
+            ctx.fillText(
+                'Hari',
+                paddingLeft + (D * cellW) / 2,
+                paddingTop + H * cellH + 42
+            );
+
+
+            // 8) save state
+            HEATMAP_STATE.dates = null; // not using full-date labels anymore
+            HEATMAP_STATE.counts = counts;
+            HEATMAP_STATE.samples = samples;
+            HEATMAP_STATE.cellW = cellW;
+            HEATMAP_STATE.cellH = cellH;
+            HEATMAP_STATE.paddingLeft = paddingLeft;
+            HEATMAP_STATE.paddingTop = paddingTop;
+            HEATMAP_STATE.maxC = maxC;
+            HEATMAP_STATE.D = D;
+            HEATMAP_STATE.H = H;
+
+            // 9) interaction: tooltip on mousemove
+            function onMove(e) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                const xRel = mx - paddingLeft;
+                const yRel = my - paddingTop;
+                const col = Math.floor(xRel / cellW);
+                const row = Math.floor(yRel / cellH);
+                if (col < 0 || col >= D || row < 0 || row >= H) {
+                    tooltip.style.display = 'none';
+                    return;
+                }
+                const cnt = counts[row][col] || 0;
+                const sampleList = samples[row][col] && samples[row][col].length ? samples[row][col].slice(0, 12) : [];
+                const title = `${String(col + 1).padStart(2, '0')} (hari-of-month) ${String(row).padStart(2, '0')}:00`;
+                const html = `📅 ${title}\nJumlah: ${cnt}\n\n${sampleList.length ? 'Contoh:\n' + sampleList.join('\n') : 'Tidak ada contoh tersimpan.'}`;
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.clientX + 12) + 'px';
+                tooltip.style.top = (e.clientY + 12) + 'px';
+                tooltip.textContent = html;
+            }
+            function onLeave() { tooltip.style.display = 'none'; }
+
+            // remove previous handlers
+            if (HEATMAP_STATE._moveHandler) {
+                canvas.removeEventListener('mousemove', HEATMAP_STATE._moveHandler);
+                canvas.removeEventListener('mouseleave', HEATMAP_STATE._leaveHandler);
+            }
+            HEATMAP_STATE._moveHandler = onMove;
+            HEATMAP_STATE._leaveHandler = onLeave;
+            canvas.addEventListener('mousemove', onMove);
+            canvas.addEventListener('mouseleave', onLeave);
+
+            // 10) update noteC summary
+            try {
+                const note = document.getElementById('noteC');
+                if (note) {
+                    const total = counts.reduce((s, row) => s + row.reduce((a, b) => a + b, 0), 0);
+                    let top = { h: 0, d: 0, v: 0 };
+                    for (let h = 0; h < H; h++) for (let i = 0; i < D; i++) {
+                        if (counts[h][i] > top.v) top = { h, d: i, v: counts[h][i] };
+                    }
+                    const topLabel = top.v ? `tanggal ${String(top.d + 1).padStart(2, '')} (${top.v})` : '-';
+                    note.querySelector('.note-body').innerHTML = `
+                <p style="margin:6px 0 0 0">Total kejadian cuaca signifikan: <strong>${total}</strong></p>
+                <p style="margin-top:8px;color:#374151;font-size:13px">Tip: arahkan kursor pada bar untuk mengetahui jumlah cuaca signifikan yang terjadi.</p>
+            `;
+                }
+            } catch (e) { console.warn(e); }
+        }
+
+
+
+
+        // ====== STATE ======
+        let ROWS = [];
+        let CHART;
+        let CHART_TREND = null;
+        let LAST_OUT = [];     // penyimpanan hasil filter terakhir
+        let WX_TREND = 'ALL';  // cuaca yang dipilih untuk filter tren (default ALL)
+
+        // ====== RENDER BAR CHART ======
+        function renderChart(rows) {
+            const freq = new Map();
+            for (const r of rows) {
+                const k = (r.sigwx || '').trim();
+                if (!k) continue;
+                freq.set(k, (freq.get(k) || 0) + 1);
+            }
+            // urutkan terbesar → kecil & ambil top-N agar rapi
+            const pairs = Array.from(freq.entries()).sort((a, b) => b[1] - a[1]);
+            const labels = pairs.map(p => p[0]);
+            const values = pairs.map(p => p[1]);
+            const TOP_N = 20; // boleh diubah
+            labels.splice(TOP_N); values.splice(TOP_N);
+
+            if (CHART) CHART.destroy();
+
+            // pastikan parent punya ukuran logis — gunakan clientHeight parent kalau mau responsive
+            const parent = elChart.parentElement || elChart;
+            // rekomendasi: pakai fixed pixel supaya Chart.js stabil
+            const desiredPx = 360; // ubah sesuai yang kamu mau, mis. 360, 420, 500
+
+            // set ukuran canvas ATTR (bukan CSS) — Chart.js membaca ukuran ini
+            elChart.width = parent.clientWidth;    // lebar pixel sesuai parent
+            elChart.height = desiredPx;             // tinggi pixel tetap
+
+            // juga set style untuk pastikan tampilannya konsisten
+            elChart.style.width = '100%';
+            elChart.style.height = desiredPx + 'px';
+
+
+            CHART = new Chart(elChart, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Jumlah Cuaca Signifikan', data: values }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,  // tetep false supaya mengikuti parent
+                    plugins: { legend: { display: false }, title: { display: true, text: 'Jumlah Cuaca Signifikan', font: { size: 14 } } },
+                    scales: {
+                        x: { ticks: { maxRotation: 60, minRotation: 60 }, title: { display: true, text: 'Cuaca Signifikan', font: { size: 12 } } },
+                        y: { title: { display: true, text: 'Jumlah Kejadian', font: { size: 12 } } }
+                    }
+                }
+            });
+
+            // ------------------ update note (ringkasan otomatis) ------------------
+            // paste langsung AFTER the Chart(...) creation (right after the closing "});")
+            try {
+                const noteEl = document.getElementById('noteA');
+                if (noteEl) {
+                    // ambil top 3 penyumbang dari labels/values
+                    const pairs = labels.map((lab, i) => ({ lab, v: values[i] || 0 }))
+                        .sort((a, b) => b.v - a.v)
+                        .slice(0, 3);
+                    const topHtml = pairs.length
+                        ? pairs.map(p => `<li><b>${escapeHtml(p.lab)}</b>: ${p.v}</li>`).join('')
+                        : '<li>Tidak ada data</li>';
+
+                    // rata-rata (bulat)
+                    const mean = values.length ? Math.round(values.reduce((s, x) => s + (Number(x) || 0), 0) / values.length) : 0;
+
+                    noteEl.querySelector('.note-body').innerHTML = `
+        <p style="margin:0 0 6px 0"><strong>Tiga cuaca signifikan tertinggi:</strong></p>
+        <ul style="margin:6px 0 8px 18px;padding:0">${topHtml}</ul>
+        <p style="margin-top:10px;color:#374151;font-size:13px">Tip: arahkan kursor pada bar untuk mengetahui jumlah cuaca signifikan yang terjadi.</p>
+    `;
+                }
+            } catch (err) {
+                console.warn('noteA update error', err);
+            }
+
+            // small helper: escape html (prevent accidental markup from labels)
+            function escapeHtml(s) {
+                return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }[c]));
+            }
+
+        }
+
+        // ---------- renderTrend (replace existing) ----------
+        function renderTrend(rows, wx = 'ALL') {
+            // rows: array objek (harus punya r.date atau r.datetime, r.sigwx, sigwx_all)
+            // wx: optional filter per cuaca ('BR', 'TS', dll.)
+
+            // 1) subset jika diminta filter cuaca
+            let dataRows = rows;
+            if (wx && wx !== 'ALL') {
+                const target = String(wx).trim().toUpperCase();
+                dataRows = rows.filter(r => {
+                    const s1 = String(r.sigwx || '').trim().toUpperCase();
+                    const sall = String(r.sigwx_all || '').toUpperCase();
+                    const tokens = (sall || '').replace(/\+/g, ' ').replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+                    return s1 === target || tokens.includes(target) || (sall || '').includes(target);
+                });
+            }
+
+            // 2) kumpulkan per-tanggal: count + set cuaca per tanggal
+            const byDayCount = new Map();   // 'YYYY-MM-DD' -> count
+            const byDayWx = new Map();      // 'YYYY-MM-DD' -> Set of wx strings
+
+            for (const r of dataRows) {
+                // prefer r.date (format DD/MM/YYYY pada datasetmu). gunakan toISO() yang sudah ada
+                let isoDate = '';
+                if (r.date) {
+                    isoDate = toISO(r.date, '') || '';
+                    if (isoDate) isoDate = isoDate.slice(0, 10);
+                }
+                // fallback ke r.datetime
+                if (!isoDate && r.datetime) {
+                    const d = new Date(r.datetime);
+                    if (!isNaN(+d)) isoDate = d.toISOString().slice(0, 10);
+                }
+                if (!isoDate) continue;
+
+                byDayCount.set(isoDate, (byDayCount.get(isoDate) || 0) + 1);
+
+                const s1 = String(r.sigwx || '').trim();
+                const sall = String(r.sigwx_all || '').trim();
+                const tokens = (sall ? sall.replace(/\+/g, ' ').replace(/,/g, ' ').split(/\s+/) : []).filter(Boolean);
+
+                const set = byDayWx.get(isoDate) || new Set();
+                if (s1) set.add(s1);
+                for (const t of tokens) if (t) set.add(t);
+                byDayWx.set(isoDate, set);
+            }
+
+
+
+            // 3) arrays terurut (ascending tanggal)
+            const labels = Array.from(byDayCount.keys()).sort((a, b) => a.localeCompare(b));
+            const values = labels.map(k => byDayCount.get(k) || 0);
+
+            // 4) siapkan canvas ukuran sama seperti chart A
+            const ctx2 = document.getElementById('chartTrend');
+            if (!ctx2) return;
+            const desiredPx = 360; // ubah kalau mau tinggi berbeda
+            ctx2.style.width = '100%';
+            ctx2.style.height = desiredPx + 'px';
+
+            // 5) destroy instance lama kalau ada
+            if (typeof CHART_TREND !== 'undefined' && CHART_TREND) CHART_TREND.destroy();
+
+            // 6) buat line chart — tooltip berisi daftar cuaca di tanggal tersebut
+            CHART_TREND = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Jumlah kejadian per hari',
+                        data: values,
+                        tension: 0.25,
+                        fill: false,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => items && items[0] ? items[0].label : '',
+                                label: (ctx) => {
+                                    const date = ctx.label;
+                                    const count = ctx.parsed?.y ?? ctx.parsed ?? ctx.raw ?? 0;
+                                    const set = byDayWx.get(date);
+                                    const list = set && set.size ? Array.from(set).join(', ') : 'Tidak ada daftar';
+                                    return `Jumlah: ${count} — ${list}`;
+                                }
+                            }
+                        }
+                    },
+                    plugins: { legend: { display: false }, title: { display: true, text: 'Frekuensi Cuaca Signifikan', font: { size: 14 } } },
+                    scales: {
+                        x: { title: { display: true, text: 'Tanggal' } },
+                        y: { title: { display: true, text: 'Jumlah Kejadian' }, beginAtZero: true }
+                    }
+                }
+            });
+
+
+            // 7) update note (Chart B) — opsional
+            try {
+                const noteB = document.getElementById('noteB');
+                if (noteB) {
+                    const total = values.reduce((s, v) => s + (Number(v) || 0), 0);
+                    noteB.querySelector('.note-body').innerHTML = `
+        <p style="margin:0">Periode: <strong>${labels[0] || '-'}</strong> s.d. <strong>${labels[labels.length - 1] || '-'}</strong></p>
+        <p style="margin:4px 0 0 0">Total kejadian pada periode: <strong>${total}</strong></p>
+        <p style="margin-top:8px;color:#374151;font-size:13px">Tip: arahkan kursor pada bar untuk mengetahui jumlah cuaca signifikan yang terjadi.</p>
+    `;
+                }
+            } catch (e) { console.warn('noteB update err', e); }
+        }
+
+
+
+        // ====== FILTER & UI UPDATE ======
+        function applyFilters() {
+            const st = selStn ? selStn.value : 'ALL';
+            const mon = selMon ? selMon.value : 'ALL';
+
+            let out = ROWS.slice();
+
+            if (st && st !== 'ALL') {
+                out = out.filter(r => String(r.icao || '').toUpperCase() === String(st).toUpperCase());
+            }
+
+            if (mon && mon !== 'ALL') {
+                if (/^\d+$/.test(mon)) {
+                    out = out.filter(r => r.monthNum === +mon);
+                } else {
+                    const mkey = String(mon).toLowerCase().slice(0, 3);
+                    const mnum = MONTH_MAP[mkey] || MONTH_MAP[String(mon).toLowerCase()] || null;
+                    if (mnum) out = out.filter(r => r.monthNum === mnum);
+                    else out = out.filter(r => String(r.month || '').toLowerCase().startsWith(mkey));
+                }
+            }
+
+            const dates = out.map(x => new Date(x.datetime)).filter(d => !isNaN(+d));
+            if (dates.length) {
+                const minD = new Date(Math.min(...dates));
+                const maxD = new Date(Math.max(...dates));
+                elChip.textContent = `Periode ${minD.toISOString().slice(0, 10)} s.d. ${maxD.toISOString().slice(0, 10)} • Rekaman ${out.length}`;
+            } else {
+                elChip.textContent = `Rekaman ${out.length}`;
+            }
+
+            renderChart(out);
+            LAST_OUT = out.slice();            // simpan salinan
+            renderTrend(LAST_OUT, WX_TREND)   // tampilkan trend sesuai pilihan WX_TREND
+            // contoh: setelah renderTrend(out) dan renderChart(out)
+            renderTimeHeatmap(out, WX_TREND || 'ALL', { maxDays: 120, cellW: 18, cellH: 20 });
+
+        }
+
+        // ====== INIT: LOAD CSV ======
+        (async function init() {
+            const res = await fetch(CSV_PATH, { cache: 'no-store' });
+            log('Fetch status: ' + res.status + ' ' + res.statusText);
+            if (!res.ok) { log('❌ Tidak bisa akses ' + CSV_PATH); return; }
+
+            const text = await res.text();
+            const first = text.split('\n')[0] || '';
+            const delim = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
+            log('Perkiraan delimiter: ' + delim);
+
+            Papa.parse(text, {
+                header: true, skipEmptyLines: true, delimiter: delim,
+                complete: (r) => {
+                    const raw = r.data || [];
+                    log('Papa.parse OK. Baris: ' + raw.length);
+                    if (!raw.length) { log('⚠️ CSV kosong.'); return; }
+
+                    // normalisasi -> sesuaikan header
+                    ROWS = raw.map(x => {
+                        const iso = toISO(x.date, x.time);
+                        const monTxt = String(x.month || '').toLowerCase();
+                        const monKey = monTxt.slice(0, 3);
+                        const monthNum = MONTH_MAP[monKey] || MONTH_MAP[monTxt] || (iso ? (new Date(iso).getUTCMonth() + 1) : null);
+                        return {
+                            datetime: iso,
+                            date: x.date, time: x.time,
+                            month: x.month, monthNum, season: x.season,
+                            icao: (x.icao || '').trim(),
+                            sigwx: (x.sigwx || '').trim(),
+                            sigwx_all: (x.sigwx_all || '').trim(),
+                            wind_kt: Number(x.wind_kt || 0),
+                            gust_kt: Number(x.gust || 0),
+                            vis_m: Number(x.vis_m || 0),
+                            cb_flag: String(x.cb_flag || '').toUpperCase()
+                        };
+                    });
+
+                    // isi dropdown stasiun otomatis
+                    if (selStn) {
+                        const stations = Array.from(new Set(ROWS.map(r => r.icao))).filter(Boolean).sort();
+                        selStn.innerHTML = '<option value="ALL">Semua</option>' + stations.map(s => `<option value="${s}">${s}</option>`).join('');
+                    }
+
+                    // event filter
+                    if (selStn) selStn.addEventListener('change', applyFilters);
+                    if (selMon) selMon.addEventListener('change', applyFilters);
+
+                    // === isi dropdown cuaca (dynamic) + pasang listener untuk chart trend ===
+                    const selWx = document.getElementById('weatherFilter');
+
+                    if (selWx) {
+                        // kumpulkan semua token cuaca dari kolom sigwx dan sigwx_all
+                        const wxSet = new Set();
+                        for (const r of ROWS) {
+                            const s1 = (r.sigwx || '').trim();
+                            if (s1) wxSet.add(s1);
+                            const sall = (r.sigwx_all || '').trim();
+                            if (sall) {
+                                // ubah + dan koma jadi spasi, lalu split
+                                const toks = sall.replace(/\+/g, ' ').replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+                                for (const t of toks) wxSet.add(t);
+                            }
+                        }
+
+                        // urutkan dan isi dropdown (opsional: hapus static html di markup)
+                        const wxList = Array.from(wxSet).sort((a, b) => a.localeCompare(b));
+                        selWx.innerHTML = '<option value="ALL">Semua</option>' + wxList.map(w => `<option value="${w}">${w}</option>`).join('');
+
+                        // set initial value (jika sebelumnya ada)
+                        selWx.value = WX_TREND || 'ALL';
+
+                        // pasang listener: ubah WX_TREND lalu render ulang trend berdasarkan LAST_OUT
+                        selWx.addEventListener('change', () => {
+                            WX_TREND = (selWx.value || 'ALL').trim();
+                            console.log('[weatherFilter] selected =', WX_TREND);
+                            // LAST_OUT sudah di-maintain oleh applyFilters(); jika belum ada, renderTrend akan bekerja pada ROWS
+                            renderTrend(LAST_OUT.length ? LAST_OUT : ROWS, WX_TREND);
+                        });
+                        // === LISTENER CHART C (HEATMAP) ===
+                        const selTimeWx = document.getElementById('timeWx');
+                        if (selTimeWx) {
+                            selTimeWx.addEventListener('change', () => {
+                                const w = (selTimeWx.value || 'ALL').trim();
+                                renderTimeHeatmap(LAST_OUT.length ? LAST_OUT : ROWS, w, {
+                                    maxDays: 120,
+                                    cellW: 18,
+                                    cellH: 20
+                                });
+                            });
+                        }
+                    }
+
+
+                    // ---- isi dropdown heatmap (timeWx) dan pasang listener ----
+                    const selTimeWx = document.getElementById('timeWx');
+                    if (selTimeWx) {
+                        // kumpulkan semua token cuaca dari kolom sigwx dan sigwx_all (mirip selWx)
+                        const wxSetForTime = new Set();
+                        for (const r of ROWS) {
+                            const s1 = (r.sigwx || '').trim();
+                            if (s1) wxSetForTime.add(s1);
+                            const sall = (r.sigwx_all || '').trim();
+                            if (sall) {
+                                const toks = sall.replace(/\+/g, ' ').replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+                                for (const t of toks) wxSetForTime.add(t);
+                            }
+                        }
+
+                        // urutkan dan isi dropdown
+                        const wxListForTime = Array.from(wxSetForTime).sort((a, b) => a.localeCompare(b));
+                        selTimeWx.innerHTML = '<option value="ALL">Semua</option>' + wxListForTime.map(w => `<option value="${w}">${w}</option>`).join('');
+                        selTimeWx.value = 'ALL';
+
+                        // saat user ganti pilihan, render ulang heatmap pake LAST_OUT (atau ROWS kalau belum ada filter)
+                        selTimeWx.addEventListener('change', () => {
+                            const chosen = (selTimeWx.value || 'ALL').trim();
+                            // gunakan LAST_OUT jika sudah ada hasil filter, supaya heatmap konsisten dengan Chart B/A
+                            const source = (typeof LAST_OUT !== 'undefined' && LAST_OUT.length) ? LAST_OUT : ROWS;
+                            renderTimeHeatmap(source, chosen, { maxDays: 120, cellW: HEATMAP_STATE.cellW || 18, cellH: HEATMAP_STATE.cellH || 20 });
+                        });
+                    }
+
+
+                    applyFilters();
+                    log('✅ Grafik dirender.');
+                },
+                error: (e) => log('Papa.parse ERROR: ' + (e?.message || e))
+            });
+        })();
+
+        // ---------- Info popup simple ----------
+        (function () {
+            const btn = document.getElementById('infoBtn');
+            const popup = document.getElementById('infoPopup');
+            const closeBtn = document.getElementById('infoClose');
+
+            if (!btn || !popup) return;
+
+            function openPopup() {
+                popup.classList.add('visible');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+            function closePopup() {
+                popup.classList.remove('visible');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                popup.classList.toggle('visible');
+                btn.setAttribute('aria-expanded', popup.classList.contains('visible') ? 'true' : 'false');
+            });
+
+            closeBtn?.addEventListener('click', (e) => { e.stopPropagation(); closePopup(); });
+
+            // close when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!popup.classList.contains('visible')) return;
+                const target = e.target;
+                if (!popup.contains(target) && target !== btn) closePopup();
+            });
+
+            // close on ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closePopup();
+            });
+
+            // prevent clicks inside popup from bubbling (so outer click handler won't close)
+            popup.addEventListener('click', (e) => e.stopPropagation());
+        })();
+
+        // ===== Glossary popup: toggle & position (static content) =====
+        (function () {
+            const btn = document.getElementById('glossaryBtn');
+            const popup = document.getElementById('glossaryPopup');
+            const closeBtn = document.getElementById('glossaryClose');
+
+            if (!btn || !popup) return;
+
+            function positionLeftOf(btnEl, popupEl) {
+                // posisi popup agar muncul di sebelah kiri tombol (tidak keluar dari viewport)
+                const r = btnEl.getBoundingClientRect();
+                const popupWidth = popupEl.offsetWidth || 320;
+                const top = window.scrollY + r.bottom + 8; // di bawah tombol
+                // let left so popup is to left of button (with small gap)
+                let left = window.scrollX + r.left - popupWidth - 8;
+                // kalau terlalu kiri (keluar layar), pakai opsi di kanan tombol
+                const minLeft = 8;
+                if (left < minLeft) {
+                    left = window.scrollX + r.right + 8; // pakai di kanan tombol
+                    // adjust pointer pseudo-element via style
+                    popupEl.style.setProperty('--glossary-arrow-left', '16px');
+                    popupEl.style.setProperty('--glossary-arrow-position', 'right');
+                } else {
+                    popupEl.style.setProperty('--glossary-arrow-left', (r.left + r.width - left - 16) + 'px');
+                    popupEl.style.setProperty('--glossary-arrow-position', 'left');
+                }
+                popupEl.style.top = top + 'px';
+                popupEl.style.left = left + 'px';
+            }
+
+            function openPopup() {
+                popup.classList.add('visible');
+                btn.setAttribute('aria-expanded', 'true');
+                // position after visible (small timeout to ensure offsetWidth available)
+                setTimeout(() => positionLeftOf(btn, popup), 10);
+            }
+            function closePopup() {
+                popup.classList.remove('visible');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                if (popup.classList.contains('visible')) closePopup(); else openPopup();
+            });
+
+            closeBtn?.addEventListener('click', (e) => { e.stopPropagation(); closePopup(); });
+
+            // close when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!popup.classList.contains('visible')) return;
+                const t = e.target;
+                if (!popup.contains(t) && t !== btn) closePopup();
+            });
+
+            // close on ESC
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePopup(); });
+
+            // prevent clicks inside popup from bubbling
+            popup.addEventListener('click', (e) => e.stopPropagation());
+        })();
+
+    </script>
+
+</body>
+
+
+</html>
