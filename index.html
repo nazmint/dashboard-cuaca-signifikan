@@ -416,6 +416,65 @@
         #glossaryClose {
             display: none;
         }
+
+        /* ========== Fix: responsive note-card font sizing ========== */
+        /* Garansi ukuran teks konsisten di desktop & mobile */
+        .note-card,
+        .note-card .note-body {
+            /* gunakan clamp agar adaptif: min 13px, prefer 1.6vw, max 15px */
+            font-size: clamp(13px, 1.6vw, 15px);
+            line-height: 1.45;
+            color: #111827;
+            /* pastikan kontras */
+        }
+
+        /* Judul kecil di dalam note-card (mis. <h3>) jangan terlalu besar */
+        .note-card h3 {
+            margin-top: 0;
+            margin-bottom: 6px;
+            font-size: clamp(16px, 2.4vw, 20px);
+            /* aman di mobile & desktop */
+            line-height: 1.15;
+        }
+
+        /* Buat teks ringkasan (note-body) sedikit lebih kecil & rapih */
+        .note-card .note-body {
+            font-size: clamp(12px, 1.4vw, 14px);
+        }
+
+        /* Pastikan scrollbar berada di dalam box dan teks tidak menimpa */
+        .note-card {
+            max-height: 360px;
+            /* batasi tinggi supaya tidak melebihi panel */
+            overflow: auto;
+            box-sizing: border-box;
+            padding: 14px;
+            /* jika butuh, sesuaikan */
+        }
+
+        /* Spesifik: jika elemen note di chart B punya class lain (mis. #noteB),
+   kita pastikan ukurannya sama. Tambahkan selector ini jika perlu */
+        #noteA,
+        #noteB,
+        #noteC,
+        .note-card {
+            font-family: system-ui, Inter, Roboto, Arial, sans-serif;
+        }
+
+        /* Mobile tweak: ketika layar sangat sempit, kurangi ukuran judul lagi */
+        @media (max-width: 420px) {
+            .note-card h3 {
+                font-size: 18px;
+            }
+
+            .note-card {
+                padding: 12px;
+            }
+
+            .note-card .note-body {
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 
@@ -1381,6 +1440,3 @@
 
 
 </html>
-
-
-
