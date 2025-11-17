@@ -1006,8 +1006,8 @@
                 }
                 const cnt = counts[row][col] || 0;
                 const sampleList = samples[row][col] && samples[row][col].length ? samples[row][col].slice(0, 12) : [];
-                const title = `${String(col + 1).padStart(2, '0')} (hari-of-month) ${String(row).padStart(2, '0')}:00`;
-                const html = `📅 ${title}\nJumlah: ${cnt}\n\n${sampleList.length ? 'Contoh:\n' + sampleList.join('\n') : 'Tidak ada contoh tersimpan.'}`;
+                const title = `${String(col + 1).padStart(2, '0')} pukul ${String(row).padStart(2, '0')}:00`;
+                const html = `Tanggal ${title}\nJumlah: ${cnt}\n\n${sampleList.length ? 'Contoh:\n' + sampleList.join('\n') : 'Tidak ada contoh tersimpan.'}`;
                 tooltip.style.display = 'block';
                 tooltip.style.left = (e.clientX + 12) + 'px';
                 tooltip.style.top = (e.clientY + 12) + 'px';
@@ -1530,4 +1530,5 @@
 
 
 </html>
+
 
